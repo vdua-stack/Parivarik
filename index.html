@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bilingual Flashcard Party Game</title>
+    <!-- Secure PDF engine that loads seamlessly on standard hosting platforms -->
+    <script src="https://cloudflare.com"></script>
+    <style>
+        :root { --primary: #4f46e5; --success: #22c55e; --danger: #ef4444; --dark: #1e1b4b; --light: #f8fafc; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--light); color: var(--dark); margin: 0; padding: 10px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 450px; background: white; padding: 15px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); box-sizing: border-box; }
+        h1, h2 { text-align: center; color: var(--primary); margin-top: 0; font-size: 22px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select, button { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        input:focus, select:focus { border-color: var(--primary); outline: none; }
+        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 8px; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .team-input-list { max-height: 160px; overflow-y: auto; margin-bottom: 12px; }
+        .card-box { height: 180px; border: 3px solid var(--primary); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; background: #f5f3ff; margin: 15px 0; text-align: center; padding: 10px; box-sizing: border-box; }
+        .card-subtext { font-size: 14px; color: #64748b; font-weight: normal; margin-top: 10px; }
+        .game-buttons { display: flex; gap: 10px; }
+        .btn-guess { background: var(--success); }
+        .btn-pass { background: var(--danger); }
+        .timer-bar { font-size: 22px; font-weight: bold; text-align: center; color: var(--danger); margin: 5px 0; }
+        .status-text { text-align: center; font-size: 16px; margin-bottom: 8px; }
+        .scoreboard { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .scoreboard th, .scoreboard td { padding: 10px; border: 1px solid #cbd5e1; text-align: left; }
+        .scoreboard th { background: #f1f5f9; }
+        .log-box { font-size: 13px; font-weight: 500; color: #1e40af; background: #eff6ff; padding: 12px; border-radius: 8px; margin-top: 10px; border: 1px solid #bfdbfe; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- SCREEN 1: FILE UPLOAD -->
+    <div id="screen-upload" class="screen active">
+        <h1>📑 Step 1: Load Words</h1>
+        <div class="form-group">
+            <label for="word-file">Upload your PDF or TXT file:</label>
+            <input type="file" id="word-file" accept=".pdf,.txt">
+        </div>
+        <div id="file-status" class="log-box">Select your vocabulary file to build game deck...</div>
+        <button id="btn-to-setup" disabled style="background: #4f46e5;">Continue to Settings</button>
+    </div>
+
+    <!-- SCREEN 2: GAME SETUP -->
+    <div id="screen-setup" class="screen">
+        <h2>⚙️ Step 2: Settings</h2>
+        <div class="form-group">
+            <label for="select-teams">Number of Teams (2-6):</label>
+            <select id="select-teams">
+                <option value="2">2 Teams</option>
+                <option value="3">3 Teams</option>
+                <option value="4">4 Teams</option>
+                <option value="5">5 Teams</option>
+                <option value="6">6 Teams</option>
+            </select>
+        </div>
+        <div class="team-input-list" id="team-names-container"></div>
+        <div class="form-group">
+            <label for="select-time">Round Timer:</label>
+            <select id="select-time">
+                <option value="30">30 Seconds</option>
+                <option value="45">45 Seconds</option>
+                <option value="60" selected>60 Seconds</option>
+                <option value="90">90 Seconds</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="select-rounds">Rounds with Deck (2-6):</label>
+            <select id="select-rounds">
+                <option value="2">2 Rounds</option>
+                <option value="3" selected>3 Rounds</option>
+                <option value="4">4 Rounds</option>
+                <option value="5">5 Rounds</option>
+                <option value="6">6 Rounds</option>
+            </select>
+        </div>
+        <button id="btn-start-game">🚀 Start Match!</button>
+    </div>
+
+    <!-- SCREEN 3: INTERMISSION -->
+    <div id="screen-intermission" class="screen">
+        <h2 id="intermission-title">Ready Up!</h2>
+        <div class="status-text" id="intermission-text"></div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 15px;">
+            <input type="checkbox" id="chk-shuffle" checked style="width: 20px; height: 20px; margin: 0; min-width: 20px;">
+            <label for="chk-shuffle" style="margin: 0; cursor: pointer;">Shuffle remaining deck?</label>
+        </div>
+        <button id="btn-begin-round">🔥 Start Round Now</button>
+    </div>
+
+    <!-- SCREEN 4: ACTIVE GAMEPLAY -->
+    <div id="screen-game" class="screen">
+        <div class="status-text"><b id="current-playing-team">Team</b>'s Turn (Round <span id="current-round-number">1</span>)</div>
+        <div class="timer-bar" id="timer-display">60s</div>
+        
+        <div class="card-box" id="flashcard">
+            <span id="card-word">WORD</span>
+            <span class="card-subtext" id="card-hint">Tap card to see translation</span>
+        </div>
+
+        <div class="game-buttons">
+            <button class="btn-pass" id="btn-pass">❌ Pass (0)</button>
+            <button class="btn-guess" id="btn-guess">✅ Guessed (+1)</button>
+        </div>
+        <div style="text-align: center; margin-top: 15px; color: #64748b; font-size: 14px;" id="remaining-count">Cards left: 0</div>
+    </div>
+
+    <!-- SCREEN 5: GAME OVER -->
+    <div id="screen-results" class="screen">
+        <h2>🏆 Final Scores</h2>
+        <table class="scoreboard" id="score-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Team Name</th>
+                    <th>Total Score</th>
+                </tr>
+            </thead>
+            <tbody id="score-body"></tbody>
+        </table>
+        <button id="btn-restart">🔄 Play Again</button>
+    </div>
+</div>
+
+<script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
+
+    let masterDeck = []; 
+    let activeDeck = []; 
+    let teams = []; 
+    let scores = {}; 
+    let config = { timeLimit: 60, totalRounds: 3 };
+    
+    let currentRoundIndex = 1;
+    let currentTeamIndex = 0;
+    let timerInterval = null;
+    let timeLeft = 0;
+    let currentCardIndex = 0;
+    let isShowingTranslation = false;
+
+    const log = document.getElementById('file-status');
+    const continueBtn = document.getElementById('btn-to-setup');
+
+    function processRawLines(lines) {
+        masterDeck = [];
+        lines.forEach(line => {
+            const match = line.split(/[:\-\,\t]+/);
+            if (match.length >= 2) {
+                const sideA = match[0].trim();
+                const sideB = match[1].trim();
+                if (sideA && sideB) {
+                    masterDeck.push({ word: sideA, translation: sideB });
+                }
+            }
+        });
+
+        if (masterDeck.length > 0) {
+            log.style.color = "#16a34a";
+            log.style.backgroundColor = "#f0fdf4";
+            log.style.borderColor = "#bbf7d0";
+            log.textContent = `🎉 Success! Loaded ${masterDeck.length} words into your flashcard deck.`;
+            continueBtn.disabled = false;
+        } else {
+            log.style.color = "#dc2626";
+            log.style.backgroundColor = "#fef2f2";
+            log.style.borderColor = "#fca5a5";
+            log.textContent = "Error parsing file text. Make sure lines use clear separator columns (e.g. Word : Translation)";
+        }
+    }
+
+    document.getElementById('word-file').addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        log.textContent = "Extracting document text locally...";
+        continueBtn.disabled = true;
+        
+        if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                let fullText = "";
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + "\n";
+                }
+                
+                // Clean line parsing splits for mixed word runs
+                const structuredLines = fullText.split(/[\n\r]+|(?<=\s)[^\s:]+:[^\s:]+(?=\s)/);
+                const rawLines = fullText.split("\n");
+                processRawLines(rawLines.length > structuredLines.length ? rawLines : structuredLines);
+            } catch (err) {
+                log.style.color = "#dc2626";
+                log.textContent = "Error reading PDF file structure: " + err.message;
