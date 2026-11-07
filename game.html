@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bilingual Flashcard Party Game</title>
+    <style>
+        :root { --primary: #4f46e5; --success: #22c55e; --danger: #ef4444; --dark: #1e1b4b; --light: #f8fafc; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--light); color: var(--dark); margin: 0; padding: 10px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 450px; background: white; padding: 15px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); box-sizing: border-box; }
+        h1, h2 { text-align: center; color: var(--primary); margin-top: 0; font-size: 22px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select, button, textarea { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; }
+        textarea { height: 130px; font-family: monospace; resize: none; font-size: 14px; }
+        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 8px; }
+        .btn-secondary { background: #64748b; }
+        .team-input-list { max-height: 140px; overflow-y: auto; margin-bottom: 12px; }
+        .card-box { height: 180px; border: 3px solid var(--primary); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; background: #f5f3ff; margin: 15px 0; text-align: center; padding: 10px; box-sizing: border-box; cursor: pointer; }
+        .card-subtext { font-size: 14px; color: #64748b; font-weight: normal; margin-top: 10px; }
+        .game-buttons { display: flex; gap: 10px; }
+        .btn-guess { background: var(--success); }
+        .btn-pass { background: var(--danger); }
+        .timer-bar { font-size: 22px; font-weight: bold; text-align: center; color: var(--danger); margin: 5px 0; }
+        .status-text { text-align: center; font-size: 16px; margin-bottom: 8px; }
+        .scoreboard { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .scoreboard th, .scoreboard td { padding: 10px; border: 1px solid #cbd5e1; text-align: left; }
+        .scoreboard th { background: #f1f5f9; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- SCREEN 1: RAW TEXT INPUT BOX -->
+    <div id="screen-upload" class="screen active">
+        <h1>📑 Step 1: Add Word Dictionary</h1>
+        <div class="form-group">
+            <label for="text-input">Paste or type your word lines below:</label>
+            <textarea id="text-input" placeholder="Dada : Grandfather&#10;Dadi : Grandmother&#10;Papa : Father"></textarea>
+        </div>
+        <button id="btn-process-text">✅ Verify & Load Vocabulary</button>
+        <button id="btn-load-demo" class="btn-secondary" style="margin-top: 5px;">✨ Quick Demo Auto-Fill</button>
+    </div>
+
+    <!-- SCREEN 2: GAME SETUP -->
+    <div id="screen-setup" class="screen">
+        <h2>⚙️ Step 2: Game Settings</h2>
+        <div class="form-group">
+            <label for="select-teams">Number of Teams (2-6):</label>
+            <select id="select-teams">
+                <option value="2">2 Teams</option>
+                <option value="3">3 Teams</option>
+                <option value="4">4 Teams</option>
+                <option value="5">5 Teams</option>
+                <option value="6">6 Teams</option>
+            </select>
+        </div>
+        <div class="team-input-list" id="team-names-container"></div>
+        <div class="form-group">
+            <label for="select-time">Round Timer:</label>
+            <select id="select-time">
+                <option value="30">30 Seconds</option>
+                <option value="45">45 Seconds</option>
+                <option value="60" selected>60 Seconds</option>
+                <option value="90">90 Seconds</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="select-rounds">Rounds with Deck (2-6):</label>
+            <select id="select-rounds">
+                <option value="2">2 Rounds</option>
+                <option value="3" selected>3 Rounds</option>
+                <option value="4">4 Rounds</option>
+                <option value="5">5 Rounds</option>
+                <option value="6">6 Rounds</option>
+            </select>
+        </div>
+        <button id="btn-start-game">🚀 Start Match!</button>
+    </div>
+
+    <!-- SCREEN 3: INTERMISSION -->
+    <div id="screen-intermission" class="screen">
+        <h2 id="intermission-title">Ready Up!</h2>
+        <div class="status-text" id="intermission-text"></div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 15px;">
+            <input type="checkbox" id="chk-shuffle" checked style="width: 20px; height: 20px; margin: 0; min-width: 20px;">
+            <label for="chk-shuffle" style="margin: 0; cursor: pointer;">Shuffle remaining deck?</label>
+        </div>
+        <button id="btn-begin-round">🔥 Start Round Now</button>
+    </div>
+
+    <!-- SCREEN 4: ACTIVE GAMEPLAY -->
+    <div id="screen-game" class="screen">
+        <div class="status-text"><b id="current-playing-team">Team</b>'s Turn (Round <span id="current-round-number">1</span>)</div>
+        <div class="timer-bar" id="timer-display">60s</div>
+        
+        <div class="card-box" id="flashcard">
+            <span id="card-word">WORD</span>
+            <span class="card-subtext" id="card-hint">Tap card to see translation</span>
+        </div>
+
+        <div class="game-buttons">
+            <button class="btn-pass" id="btn-pass">❌ Pass (0)</button>
+            <button class="btn-guess" id="btn-guess">✅ Guessed (+1)</button>
+        </div>
+        <div style="text-align: center; margin-top: 15px; color: #64748b; font-size: 14px;" id="remaining-count">Cards left: 0</div>
+    </div>
+
+    <!-- SCREEN 5: GAME OVER -->
+    <div id="screen-results" class="screen">
+        <h2>🏆 Final Scores</h2>
+        <table class="scoreboard" id="score-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Team Name</th>
+                    <th>Total Score</th>
+                </tr>
+            </thead>
+            <tbody id="score-body"></tbody>
+        </table>
+        <button id="btn-restart">🔄 Play Again</button>
+    </div>
+</div>
+
+<script>
+    let masterDeck = []; 
+    let activeDeck = []; 
+    let teams = []; 
+    let scores = {}; 
+    let config = { timeLimit: 60, totalRounds: 3 };
+    
+    let currentRoundIndex = 1;
+    let currentTeamIndex = 0;
+    let timerInterval = null;
+    let timeLeft = 0;
+    let currentCardIndex = 0;
+    let isShowingTranslation = false;
+
+    function parseInputText(text) {
+        const lines = text.split(/[\n\r]+/);
+        masterDeck = [];
+        
+        lines.forEach(line => {
+            if (!line.trim()) return;
+            const match = line.split(/[:\-\,\t]+/);
+            if (match.length >= 2) {
+                const sideA = match[0].trim();
+                const sideB = match[1].trim();
+                if (sideA && sideB) {
+                    masterDeck.push({ word: sideA, translation: sideB });
+                }
+            } else if (line.trim().length > 1) {
+                masterDeck.push({ word: line.trim(), translation: "Review Card" });
+            }
+        });
+        
+        if (masterDeck.length > 0) {
+            document.getElementById('screen-upload').classList.remove('active');
+            document.getElementById('screen-setup').classList.add('active');
+            renderTeamInputs();
+        } else {
+            alert("Please type or paste some words first.");
+        }
+    }
+
+    document.getElementById('btn-process-text').addEventListener('click', function() {
+        const textValue = document.getElementById('text-input').value;
+        parseInputText(textValue);
+    });
+
+    document.getElementById('btn-load-demo').addEventListener('click', () => {
+        const demoText = "Dada : Grandfather\nDadi : Grandmother\nPapa : Father\nMummy : Mother\nBhai : Brother\nBehen : Sister";
+        document.getElementById('text-input').value = demoText;
+        parseInputText(demoText);
+    });
+
+    document.getElementById('select-teams').addEventListener('change', renderTeamInputs);
+
+    function renderTeamInputs() {
+        const container = document.getElementById('team-names-container');
+        const numTeams = parseInt(document.getElementById('select-teams').value);
+        container.innerHTML = "<label>Name Your Teams:</label>";
+        for (let i = 1; i <= numTeams; i++) {
+            container.innerHTML += `<input type="text" id="team-name-${i}" value="Team ${i}" style="margin-bottom: 6px; padding: 8px;">`;
+        }
+    }
+
+    document.getElementById('btn-start-game').addEventListener('click', () => {
+        const numTeams = parseInt(document.getElementById('select-teams').value);
+        teams = []; scores = {};
+        for (let i = 1; i <= numTeams; i++) {
+            const name = document.getElementById(`team-name-${i}`).value.trim() || `Team ${i}`;
+            teams.push(name); scores[name] = 0;
+        }
+        config.timeLimit = parseInt(document.getElementById('select-time').value);
+        config.totalRounds = parseInt(document.getElementById('select-rounds').value);
+        currentRoundIndex = 1; currentTeamIndex = 0;
+        activeDeck = [...masterDeck];
+        shuffleArray(activeDeck);
+        prepareIntermission();
+    });
+
+    function shuffleArray(array) {
+  
