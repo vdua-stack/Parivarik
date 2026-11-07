@@ -43,8 +43,7 @@
             <input type="file" id="word-file" accept=".txt">
         </div>
         <div id="file-status" class="log-box">Select your .txt file to begin...</div>
-        <button id="btn-to-setup" disabled>Continue to Settings</button>
-        <button id="btn-force-setup" class="btn-secondary">✨ Skip & Play with Demo Words</button>
+        <button id="btn-to-setup" disabled style="background: #4f46e5; color: white;">Continue to Settings</button>
     </div>
 
     <!-- SCREEN 2: GAME SETUP -->
@@ -145,25 +144,27 @@
     const log = document.getElementById('file-status');
     const continueBtn = document.getElementById('btn-to-setup');
 
-    let demoDeck = [
-        {word: "Yawning (उबासी)", translation: "Yawning"},
-        {word: "Assembly (प्रार्थना सभा)", translation: "Assembly"},
-        {word: "Almond (बादाम)", translation: "Almond"}
-    ];
-
     function processRawLines(lines) {
         masterDeck = [];
+        
         lines.forEach(line => {
-            if (!line.trim()) return;
-            const match = line.split(/[:\-\,]+/);
-            if (match.length >= 2) {
-                const sideA = match[0].trim();
-                const sideB = match[1].trim();
-                if (sideA && sideB) {
-                    masterDeck.push({ word: sideA, translation: sideB });
-                }
-            } else if (line.trim().length > 1) {
-                masterDeck.push({ word: line.trim(), translation: "Review Card" });
+            const cleanLine = line.trim();
+            if (!cleanLine) return;
+            
+            // Smart splitter: checks for colons, dashes, commas, tabs, or multiple spaces
+            const parts = cleanLine.split(/[:\-\,\t]+|\s{2,}/);
+            
+            if (parts.length >= 2) {
+                masterDeck.push({ 
+                    word: parts[0].trim(), 
+                    translation: parts[1].trim() 
+                });
+            } else {
+                // ABSOLUTE FALLBACK: If there is no separator, put the whole line on the card
+                masterDeck.push({ 
+                    word: cleanLine, 
+                    translation: "Flip Card" 
+                });
             }
         });
 
@@ -175,7 +176,7 @@
             continueBtn.disabled = false;
         } else {
             log.style.color = "#dc2626";
-            log.textContent = "Error: Check your text file layout.";
+            log.textContent = "Error: File appears to be empty.";
         }
     }
 
@@ -187,22 +188,17 @@
         
         const reader = new FileReader();
         reader.onload = function(evt) {
-            processRawLines(evt.target.result.split(/[\n\r]+/));
+            const textContent = evt.target.result;
+            processRawLines(textContent.split(/[\n\r]+/));
         };
         reader.readAsText(file);
     });
 
-    continueBtn.addEventListener('click', () => { goToSetupScreen(); });
-    document.getElementById('btn-force-setup').addEventListener('click', () => {
-        masterDeck = [...demoDeck];
-        goToSetupScreen();
-    });
-
-    function goToSetupScreen() {
+    continueBtn.addEventListener('click', () => {
         document.getElementById('screen-upload').classList.remove('active');
         document.getElementById('screen-setup').classList.add('active');
         renderTeamInputs();
-    }
+    });
 
     document.getElementById('select-teams').addEventListener('change', renderTeamInputs);
 
@@ -211,3 +207,7 @@
         const numTeams = parseInt(document.getElementById('select-teams').value);
         container.innerHTML = "<label>Name Your Teams:</label>";
         for (let i = 1; i <= numTeams; i++) {
+            container.innerHTML += `<input type="text" id="team-name-${i}" value="Team ${i}" style="margin-bottom: 6px; padding: 8px;">`;
+        }
+    }
+
