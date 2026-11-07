@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bilingual Flashcard Party Game</title>
-    <!-- Secure PDF engine that loads seamlessly on standard hosting platforms -->
+    <!-- Secure PDF engine -->
     <script src="https://cloudflare.com"></script>
     <style>
         :root { --primary: #4f46e5; --success: #22c55e; --danger: #ef4444; --dark: #1e1b4b; --light: #f8fafc; }
@@ -18,7 +18,8 @@
         input, select, button { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
         input:focus, select:focus { border-color: var(--primary); outline: none; }
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 8px; }
-        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        button:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed; }
+        .btn-secondary { background: #64748b; }
         .team-input-list { max-height: 160px; overflow-y: auto; margin-bottom: 12px; }
         .card-box { height: 180px; border: 3px solid var(--primary); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; background: #f5f3ff; margin: 15px 0; text-align: center; padding: 10px; box-sizing: border-box; }
         .card-subtext { font-size: 14px; color: #64748b; font-weight: normal; margin-top: 10px; }
@@ -44,7 +45,8 @@
             <input type="file" id="word-file" accept=".pdf,.txt">
         </div>
         <div id="file-status" class="log-box">Select your vocabulary file to build game deck...</div>
-        <button id="btn-to-setup" disabled style="background: #4f46e5;">Continue to Settings</button>
+        <button id="btn-to-setup" disabled>Continue to Settings</button>
+        <button id="btn-force-setup" class="btn-secondary">⚠️ Emergency Force Skip & Play</button>
     </div>
 
     <!-- SCREEN 2: GAME SETUP -->
@@ -147,9 +149,24 @@
     const log = document.getElementById('file-status');
     const continueBtn = document.getElementById('btn-to-setup');
 
+    // Default backup words list just in case file parsing breaks down completely
+    let backupDeck = [
+        {word: "Dada (Grandfather)", translation: "दादा"},
+        {word: "Dadi (Grandmother)", translation: "दादी"},
+        {word: "Papa (Father)", translation: "पापा"},
+        {word: "Mummy (Mother)", translation: "मम्मी"},
+        {word: "Bhai (Brother)", translation: "भाई"},
+        {word: "Behen (Sister)", translation: "बहन"},
+        {word: "Beta (Son)", translation: "बेटा"},
+        {word: "Beti (Daughter)", translation: "बेटी"},
+        {word: "Dost (Friend)", translation: "दोस्त"},
+        {word: "Ghar (House)", translation: "घर"}
+    ];
+
     function processRawLines(lines) {
         masterDeck = [];
         lines.forEach(line => {
+            if (!line.trim()) return;
             const match = line.split(/[:\-\,\t]+/);
             if (match.length >= 2) {
                 const sideA = match[0].trim();
@@ -157,6 +174,9 @@
                 if (sideA && sideB) {
                     masterDeck.push({ word: sideA, translation: sideB });
                 }
+            } else if (line.trim().length > 3) {
+                // If line has no direct colon divider, place whole line as word frame
+                masterDeck.push({ word: line.trim(), translation: "Flip for review" });
             }
         });
 
@@ -167,10 +187,8 @@
             log.textContent = `🎉 Success! Loaded ${masterDeck.length} words into your flashcard deck.`;
             continueBtn.disabled = false;
         } else {
-            log.style.color = "#dc2626";
-            log.style.backgroundColor = "#fef2f2";
-            log.style.borderColor = "#fca5a5";
-            log.textContent = "Error parsing file text. Make sure lines use clear separator columns (e.g. Word : Translation)";
+            log.style.color = "#b45309";
+            log.textContent = "Loaded file rows but couldn't separate translation columns. Tap 'Emergency Force Skip' to use backup deck.";
         }
     }
 
@@ -183,20 +201,3 @@
         
         if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                let fullText = "";
-                
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    fullText += textContent.items.map(item => item.str).join(" ") + "\n";
-                }
-                
-                // Clean line parsing splits for mixed word runs
-                const structuredLines = fullText.split(/[\n\r]+|(?<=\s)[^\s:]+:[^\s:]+(?=\s)/);
-                const rawLines = fullText.split("\n");
-                processRawLines(rawLines.length > structuredLines.length ? rawLines : structuredLines);
-            } catch (err) {
-                log.style.color = "#dc2626";
-                log.textContent = "Error reading PDF file structure: " + err.message;
