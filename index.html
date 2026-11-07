@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bilingual Flashcard Party Game</title>
-    <!-- Secure PDF engine -->
-    <script src="https://cloudflare.com"></script>
     <style>
         :root { --primary: #4f46e5; --success: #22c55e; --danger: #ef4444; --dark: #1e1b4b; --light: #f8fafc; }
         body { font-family: system-ui, -apple-system, sans-serif; background: var(--light); color: var(--dark); margin: 0; padding: 10px; display: flex; justify-content: center; }
@@ -41,12 +39,12 @@
     <div id="screen-upload" class="screen active">
         <h1>📑 Step 1: Load Words</h1>
         <div class="form-group">
-            <label for="word-file">Upload your PDF or TXT file:</label>
-            <input type="file" id="word-file" accept=".pdf,.txt">
+            <label for="word-file">Upload your parivarik_part_1.txt file:</label>
+            <input type="file" id="word-file" accept=".txt">
         </div>
-        <div id="file-status" class="log-box">Select your vocabulary file to build game deck...</div>
+        <div id="file-status" class="log-box">Select your .txt file to begin...</div>
         <button id="btn-to-setup" disabled>Continue to Settings</button>
-        <button id="btn-force-setup" class="btn-secondary">⚠️ Emergency Force Skip & Play</button>
+        <button id="btn-force-setup" class="btn-secondary">✨ Skip & Play with Demo Words</button>
     </div>
 
     <!-- SCREEN 2: GAME SETUP -->
@@ -131,8 +129,6 @@
 </div>
 
 <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
-
     let masterDeck = []; 
     let activeDeck = []; 
     let teams = []; 
@@ -149,18 +145,13 @@
     const log = document.getElementById('file-status');
     const continueBtn = document.getElementById('btn-to-setup');
 
-    // Default backup words list just in case file parsing breaks down completely
-    let backupDeck = [
+    let demoDeck = [
         {word: "Dada (Grandfather)", translation: "दादा"},
         {word: "Dadi (Grandmother)", translation: "दादी"},
         {word: "Papa (Father)", translation: "पापा"},
         {word: "Mummy (Mother)", translation: "मम्मी"},
         {word: "Bhai (Brother)", translation: "भाई"},
-        {word: "Behen (Sister)", translation: "बहन"},
-        {word: "Beta (Son)", translation: "बेटा"},
-        {word: "Beti (Daughter)", translation: "बेटी"},
-        {word: "Dost (Friend)", translation: "दोस्त"},
-        {word: "Ghar (House)", translation: "घर"}
+        {word: "Behen (Sister)", translation: "बहन"}
     ];
 
     function processRawLines(lines) {
@@ -174,9 +165,6 @@
                 if (sideA && sideB) {
                     masterDeck.push({ word: sideA, translation: sideB });
                 }
-            } else if (line.trim().length > 3) {
-                // If line has no direct colon divider, place whole line as word frame
-                masterDeck.push({ word: line.trim(), translation: "Flip for review" });
             }
         });
 
@@ -184,20 +172,43 @@
             log.style.color = "#16a34a";
             log.style.backgroundColor = "#f0fdf4";
             log.style.borderColor = "#bbf7d0";
-            log.textContent = `🎉 Success! Loaded ${masterDeck.length} words into your flashcard deck.`;
+            log.textContent = `🎉 Success! Loaded ${masterDeck.length} words.`;
             continueBtn.disabled = false;
         } else {
-            log.style.color = "#b45309";
-            log.textContent = "Loaded file rows but couldn't separate translation columns. Tap 'Emergency Force Skip' to use backup deck.";
+            log.style.color = "#dc2626";
+            log.textContent = "Error: Make sure your text file rows look like 'Word : Translation'";
         }
     }
 
-    document.getElementById('word-file').addEventListener('change', async function(e) {
+    document.getElementById('word-file').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
         
-        log.textContent = "Extracting document text locally...";
-        continueBtn.disabled = true;
+        log.textContent = "Reading file content...";
         
-        if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
-            try {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            processRawLines(evt.target.result.split(/[\n\r]+/));
+        };
+        reader.readAsText(file);
+    });
+
+    continueBtn.addEventListener('click', () => { goToSetupScreen(); });
+    document.getElementById('btn-force-setup').addEventListener('click', () => {
+        masterDeck = [...demoDeck];
+        goToSetupScreen();
+    });
+
+    function goToSetupScreen() {
+        document.getElementById('screen-upload').classList.remove('active');
+        document.getElementById('screen-setup').classList.add('active');
+        renderTeamInputs();
+    }
+
+    document.getElementById('select-teams').addEventListener('change', renderTeamInputs);
+
+    function renderTeamInputs() {
+        const container = document.getElementById('team-names-container');
+        const numTeams = parseInt(document.getElementById('select-teams').value);
+        container.innerHTML = "<label>Name Your Teams:</label>";
+        for (let i = 1; i <= numTeams; i++) {
